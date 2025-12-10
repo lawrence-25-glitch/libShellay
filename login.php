@@ -35,7 +35,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             
             // This solves your previous question! 
             // Make sure your database column is actually named 'username'
-            $_SESSION['username'] = $row['username']; 
+            $_SESSION['username'] = $row['fullName']; 
             
             // Redirect based on the role stored in the DATABASE (not the form)
             // We use strtolower to make it case-insensitive just in case

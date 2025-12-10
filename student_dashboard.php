@@ -19,10 +19,11 @@ function addNotification($conn, $uid, $msg) {
 }
 
 // 3. HANDLE RESERVATION (Limit: 3 Books)
-// First, count current books
+// First, count how many books this student has (Borrowed OR Reserved)
 $countSql = "SELECT COUNT(*) as total FROM transactions WHERE user_id = $userId AND status IN ('Borrowed', 'Reserved')";
 $current_borrows = $conn->query($countSql)->fetch_assoc()['total'];
 
+// --- FIX: This PHP block now matches the HTML form below ---
 if (isset($_POST['reserve_book'])) {
     $book_id = $_POST['book_id'];
 
@@ -35,7 +36,7 @@ if (isset($_POST['reserve_book'])) {
         if ($check['quantity'] > 0) {
             $date = date('Y-m-d');
             
-            // A. Create Transaction
+            // A. Create Transaction (Status = Reserved)
             $stmt = $conn->prepare("INSERT INTO transactions (user_id, book_id, date_reserved, status) VALUES (?, ?, ?, 'Reserved')");
             $stmt->bind_param("iis", $userId, $book_id, $date);
             
@@ -46,7 +47,8 @@ if (isset($_POST['reserve_book'])) {
                 // C. Notify User
                 addNotification($conn, $userId, "You reserved '{$check['title']}'. Please pick it up within 24 hours.");
                 
-                echo "<script>alert('✅ Book Reserved Successfully!'); window.location.href='student_dashboard.php';</script>";
+                // Refresh page
+                echo "<script>window.location.href='student_dashboard.php';</script>";
             }
         } else {
             echo "<script>alert('❌ Error: Book is out of stock.');</script>";
@@ -55,12 +57,11 @@ if (isset($_POST['reserve_book'])) {
 }
 
 // 4. FETCH DATA
-// Notifications
 $notifSql = "SELECT * FROM notifications WHERE user_id = $userId ORDER BY created_at DESC";
 $notifications = $conn->query($notifSql);
 $notifCount = $notifications->num_rows;
 
-// Penalty Check (Placeholder logic)
+// Calculate Penalty (Placeholder)
 $penalty = "₱0.00";
 ?>
 
@@ -80,6 +81,10 @@ $penalty = "₱0.00";
     .notif-item { padding: 10px; border-bottom: 1px solid #eee; font-size: 14px; }
     .notif-date { font-size: 11px; color: #888; display: block; margin-top: 4px; }
     .badge { background: #ef4444; color: white; font-size: 10px; padding: 2px 6px; border-radius: 10px; margin-left: 5px; vertical-align: middle; }
+    
+    /* Button Style Fix */
+    .btn-reserve { background-color: #f59e0b; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; }
+    .btn-reserve:hover { background-color: #d97706; }
   </style>
 </head>
 <body>
@@ -149,8 +154,8 @@ $penalty = "₱0.00";
                         <td>
                             <?php if ($qty > 0) { ?>
                             <form method="POST">
-                                <input type="hidden" name="borrow_book_id" value="<?php echo $row['book_id']; ?>">
-                                <button type="submit" class="btn-borrow">Borrow</button>
+                                <input type="hidden" name="book_id" value="<?php echo $row['book_id']; ?>">
+                                <button type="submit" name="reserve_book" class="btn-reserve">Reserve</button>
                             </form>
                             <?php } else { echo "Unavailable"; } ?>
                         </td>
