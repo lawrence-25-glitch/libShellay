@@ -3,14 +3,203 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Smart Library System</title>
-  <link rel="stylesheet" href="landing.css">
+  <title>Library System</title>
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: url('pics/cat.jpg') no-repeat center center fixed;
+      background-size: cover;
+    }
+    .app-container {
+      min-height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+    .landing-page {
+      flex: 1;
+      overflow-y: auto;
+      padding: 40px 20px;
+      color: white;
+      text-align: center;
+    }
+    .hero-title {
+      font-size: 48px;
+      font-weight: 800;
+      margin-bottom: 20px;
+    }
+    .hero-subtitle {
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: 16px;
+    }
+    .hero-description {
+      max-width: 700px;
+      margin: 0 auto 40px;
+      line-height: 1.6;
+    }
+    .btn {
+      display: inline-block;
+      padding: 14px 32px;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+    }
+    .btn-primary {
+      background: #667eea;
+      color: white;
+    }
+    .btn-primary:hover {
+      background: #bdc3eaff;
+    }
+    .section-title {
+      font-size: 32px;
+      font-weight: 700;
+      margin: 60px 0 24px;
+    }
+    .features-grid, .roles-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 20px;
+      margin-bottom: 40px;
+    }
+    .feature-card, .role-card {
+      background: white;
+      color: #333;
+      padding: 24px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    .feature-icon, .role-icon {
+      font-size: 40px;
+      margin-bottom: 12px;
+    }
+    .feature-title, .role-title {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+    .feature-description, .role-features li {
+      font-size: 14px;
+      color: #555;
+    }
+    .role-features {
+      list-style: none;
+      padding: 0;
+    }
+    .role-features li::before {
+      content: "✓ ";
+      color: #10b981;
+      font-weight: bold;
+    }
+    .cta-section {
+      margin-top: 60px;
+      padding: 40px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 16px;
+    }
+    .cta-title {
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+    .cta-description {
+      margin-bottom: 20px;
+    }
+    /* Login Screen */
+    .login-screen {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      background: #f9fafb;
+    }
+    .login-card {
+      background: white;
+      border-radius: 12px;
+      padding: 32px;
+      max-width: 400px;
+      width: 100%;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+    }
+    .login-card h1 {
+      margin-bottom: 10px;
+      font-size: 24px;
+      color: #333;
+    }
+    .form-group {
+      margin-bottom: 16px;
+      text-align: left;
+    }
+    .form-group label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: 600;
+      font-size: 14px;
+    }
+    .form-group input, .form-group select {
+      width: 100%;
+      padding: 10px;
+      border: 2px solid #e0e0e0;
+      border-radius: 6px;
+      font-size: 14px;
+    }
+    .btn-secondary {
+      background: #f0f0f0;
+      color: #333;
+      margin-top: 10px;
+    }
+    .btn-secondary:hover {
+      background: #e0e0e0;
+    }
+    /* Dashboard (static sample) */
+    .main-screen {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+    .navbar {
+      background: white;
+      padding: 16px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .navbar-brand {
+      font-weight: 700;
+      color: #667eea;
+    }
+    .dashboard-container {
+      flex: 1;
+      padding: 24px;
+      color: white;
+    }
+    .dashboard-header h2 {
+      margin: 0 0 8px;
+      font-size: 24px;
+    }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 16px;
+      margin-top: 20px;
+    }
+    .stat-card {
+      background: white;
+      color: #333;
+      padding: 16px;
+      border-radius: 8px;
+      text-align: center;
+    }
+  </style>
 </head>
 <body>
   <div class="app-container">
     <!-- Landing Page -->
     <div class="landing-page">
-      <h1 class="hero-title">Smart Library System</h1>
+      <h1 class="hero-title">Library System</h1>
       <p class="hero-subtitle">Modern Library Management for the Digital Age</p>
       <p class="hero-description">Empowering students, teachers, librarians, and staff with seamless book management, online reservations, and automated tracking.</p>
       <a href="login.php" class="btn btn-primary">Get Started</a>
@@ -28,11 +217,4 @@
         <div class="role-card"><div class="role-icon">👨‍🏫</div><h3 class="role-title">Teachers</h3><ul class="role-features"><li>Unlimited borrowing</li><li>Priority reservations</li></ul></div>
       </div>
 
-      <div class="cta-section">
-        <h2 class="cta-title">Ready to Transform Your Library?</h2>
-        <p class="cta-description">Join hundreds of institutions using Smart Library System</p>
-        <a href="login.php" class="btn btn-primary">Get Started Now</a>
-      </div>
     </div>
-
-    

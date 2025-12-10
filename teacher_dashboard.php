@@ -1,6 +1,6 @@
 <?php
 session_start();
-include 'db.php'; // Using your existing db connection
+include 'db.php'; 
 
 // 1. SECURITY CHECK
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'Teacher') {
@@ -11,9 +11,9 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'Teacher') {
 $userId = $_SESSION['user_id'];
 $userName = $_SESSION['full_name'];
 
-// 2. HELPER: ADD NOTIFICATION
+// 2. HELPER: ADD NOTIFICATION FUNCTION
 function createNotification($conn, $u_id, $msg) {
-    $stmt = $conn->prepare("INSERT INTO notifications (user_id, message) VALUES (?, ?)");
+    $stmt = $conn->prepare("INSERT INTO notifications (user_id, message, is_read) VALUES (?, ?, 0)");
     $stmt->bind_param("is", $u_id, $msg);
     $stmt->execute();
 }
@@ -26,19 +26,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $book_id = $_POST['borrow_book_id'];
         
         // Check stock
-        $stmt = $conn->prepare("SELECT title, author, quantity FROM books WHERE book_id = ?");
+        $stmt = $conn->prepare("SELECT title, quantity FROM books WHERE book_id = ?");
         $stmt->bind_param("i", $book_id);
         $stmt->execute();
         $book = $stmt->get_result()->fetch_assoc();
 
         if ($book && $book['quantity'] > 0) {
-            // A. Create Transaction (Borrowed)
             $date = date('Y-m-d');
             $stmt = $conn->prepare("INSERT INTO transactions (user_id, book_id, date_borrowed, status) VALUES (?, ?, ?, 'Borrowed')");
             $stmt->bind_param("iis", $userId, $book_id, $date);
             $stmt->execute();
 
-            // B. Decrease Stock
             $conn->query("UPDATE books SET quantity = quantity - 1 WHERE book_id = $book_id");
 
             $_SESSION['flash_message'] = "✅ Success! You borrowed: " . $book['title'];
@@ -51,19 +49,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (isset($_POST['reserve_book_id'])) {
         $book_id = $_POST['reserve_book_id'];
         
-        // Get Title
         $stmt = $conn->prepare("SELECT title FROM books WHERE book_id = ?");
         $stmt->bind_param("i", $book_id);
         $stmt->execute();
         $title = $stmt->get_result()->fetch_assoc()['title'];
 
-        // A. Create Transaction (Reserved)
         $date = date('Y-m-d');
         $stmt = $conn->prepare("INSERT INTO transactions (user_id, book_id, date_reserved, status) VALUES (?, ?, ?, 'Reserved')");
         $stmt->bind_param("iis", $userId, $book_id, $date);
         $stmt->execute();
 
-        // B. Send Notification
+        // Send Notification (is_read will be 0 by default)
         createNotification($conn, $userId, "Reservation confirmed for '$title'. Please pick it up within 24 hours.");
 
         $_SESSION['flash_message'] = "🔖 Reserved: " . $title;
@@ -80,10 +76,14 @@ $books = $conn->query("SELECT * FROM books ORDER BY title ASC");
 $countSql = "SELECT COUNT(*) as total FROM transactions WHERE user_id = $userId AND status IN ('Borrowed', 'Reserved')";
 $myBooksCount = $conn->query($countSql)->fetch_assoc()['total'];
 
-// Notifications
-$notifSql = "SELECT * FROM notifications WHERE user_id = $userId ORDER BY id DESC";
-$notifications = $conn->query($notifSql);
-$notifCount = $notifications->num_rows;
+// --- NOTIFICATION LOGIC FIX ---
+// A. Count ONLY unread messages for the Red Badge
+$unreadSql = "SELECT COUNT(*) as unread FROM notifications WHERE user_id = $userId AND is_read = 0";
+$notifCount = $conn->query($unreadSql)->fetch_assoc()['unread'];
+
+// B. Get ALL messages (Read and Unread) for the Modal List
+$listSql = "SELECT * FROM notifications WHERE user_id = $userId ORDER BY id DESC LIMIT 10";
+$notifications = $conn->query($listSql);
 ?>
 
 <!DOCTYPE html>
@@ -92,27 +92,10 @@ $notifCount = $notifications->num_rows;
   <meta charset="UTF-8" />
   <title>Teacher Dashboard</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="stylesheet" href="SD.css"> <style>
-    /* Custom Styles for Teacher Dashboard */
-    .btn-borrow { background-color: #10b981; color: white; border:none; padding: 6px 12px; border-radius: 6px; cursor: pointer; }
-    .btn-reserve { background-color: #f59e0b; color: white; border:none; padding: 6px 12px; border-radius: 6px; cursor: pointer; }
-    .btn-borrow:hover, .btn-reserve:hover { opacity: 0.9; }
+  <link rel="stylesheet" href="SD.css"> 
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
     
-    /* Notification Badge */
-    .badge { background: #ef4444; color: white; font-size: 10px; padding: 2px 6px; border-radius: 10px; margin-left: 5px; vertical-align: middle; }
-    
-    /* Modal Styles */
-    .modal { display: none; position: fixed; z-index: 100; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); }
-    .modal-content { background-color: #fff; margin: 10% auto; padding: 20px; border-radius: 12px; width: 80%; max-width: 500px; box-shadow: 0 4px 20px rgba(0,0,0,0.2); }
-    .close-modal { float: right; font-size: 24px; cursor: pointer; color: #aaa; }
-    .close-modal:hover { color: #000; }
-    .notif-list { list-style: none; padding: 0; margin-top: 15px; }
-    .notif-item { padding: 10px; border-bottom: 1px solid #eee; font-size: 14px; color: #333; }
-    .notif-time { display: block; font-size: 11px; color: #888; margin-top: 4px; }
-
-    /* Toast Notification */
-    .toast { position: fixed; bottom: 20px; right: 20px; background: #fff; border-left: 5px solid #10b981; padding: 15px 25px; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); animation: slideIn 0.5s ease; z-index: 1000; }
-    @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
   </style>
 </head>
 <body>
@@ -132,7 +115,9 @@ $notifCount = $notifications->num_rows;
         <a href="teacher_dashboard.php">📊 Dashboard</a>
         <a href="#" onclick="openModal()">
             🔔 Notifications 
-            <?php if($notifCount > 0) echo "<span class='badge'>$notifCount</span>"; ?>
+            <?php if($notifCount > 0): ?>
+                <span class='badge' id="navBadge"><?php echo $notifCount; ?></span>
+            <?php endif; ?>
         </a>
         <a href="logout.php" class="signout">🚪 Sign Out</a>
       </nav>
@@ -157,7 +142,7 @@ $notifCount = $notifications->num_rows;
           </div>
           <div class="card warning">
             <div class="label">Unread Alerts</div>
-            <div class="value"><?php echo $notifCount; ?></div>
+            <div class="value" id="cardBadge"><?php echo $notifCount; ?></div>
             <div class="note">Check notifications</div>
           </div>
         </section>
@@ -190,7 +175,7 @@ $notifCount = $notifications->num_rows;
                         <td><?php echo htmlspecialchars($row['category']); ?></td>
                         <td>
                             <?php if($qty > 0): ?>
-                                <span style="color:#10b981; font-weight:bold;">Available (<?php echo $qty; ?>)</span>
+                                <span style="color:#10b981; font-weight:bold;">(<?php echo $qty; ?>)</span>
                             <?php else: ?>
                                 <span style="color:#ef4444; font-weight:bold;">Out of Stock</span>
                             <?php endif; ?>
@@ -199,7 +184,7 @@ $notifCount = $notifications->num_rows;
                             <form method="POST" style="margin:0;">
                                 <?php if($qty > 0): ?>
                                     <input type="hidden" name="borrow_book_id" value="<?php echo $row['book_id']; ?>">
-                                    <button type="submit" class="btn-borrow">Borrow</button>
+                                    <button type="submit" class="btn-borrow">Reserve</button>
                                 <?php else: ?>
                                     <input type="hidden" name="reserve_book_id" value="<?php echo $row['book_id']; ?>">
                                     <button type="submit" class="btn-reserve">Reserve</button>
@@ -228,11 +213,13 @@ $notifCount = $notifications->num_rows;
     <h3>🔔 Your Notifications</h3>
     <ul class="notif-list">
         <?php 
-        if ($notifCount > 0) {
-            // Reset pointer to start of result set
-            $notifications->data_seek(0); 
+        if ($notifications->num_rows > 0) {
+            // No need to data_seek here if we are just iterating once
             while($notif = $notifications->fetch_assoc()) {
-                echo "<li class='notif-item'>";
+                // Style unread messages differently (optional)
+                $bg = ($notif['is_read'] == 0) ? "background:#f0f9ff;" : "";
+                
+                echo "<li class='notif-item' style='$bg'>";
                 echo htmlspecialchars($notif['message']);
                 echo "<span class='notif-time'>" . $notif['created_at'] . "</span>";
                 echo "</li>";
@@ -259,8 +246,27 @@ $notifCount = $notifications->num_rows;
 <?php endif; ?>
 
 <script>
-    function openModal() { document.getElementById('notifModal').style.display = "block"; }
-    function closeModal() { document.getElementById('notifModal').style.display = "none"; }
+    // --- THIS IS THE CRITICAL JAVASCRIPT PART ---
+    function openModal() { 
+        document.getElementById('notifModal').style.display = "block"; 
+        
+        // 1. Visually hide the red badge in the Sidebar
+        const navBadge = document.getElementById('navBadge');
+        if(navBadge) navBadge.style.display = 'none';
+
+        // 2. Update the "Unread Alerts" card number to 0
+        const cardBadge = document.getElementById('cardBadge');
+        if(cardBadge) cardBadge.innerText = '0';
+
+        // 3. Send background signal to mark_as_read.php
+        fetch('mark_as_read.php')
+            .then(response => console.log('Notifications marked as read'))
+            .catch(error => console.error('Error:', error));
+    }
+
+    function closeModal() { 
+        document.getElementById('notifModal').style.display = "none"; 
+    }
     
     // Close modal if user clicks outside of it
     window.onclick = function(event) {

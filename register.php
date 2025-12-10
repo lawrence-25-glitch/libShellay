@@ -21,14 +21,22 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     }
 
     $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
-    $sql = "INSERT INTO users (full_name, email, student_id, role, phone, password) 
-            VALUES ('$fullName', '$email', '$studentId', '$role', '$phone', '$hashedPassword')";
+    // 1. Check if email already exists
+    $checkEmail = "SELECT email FROM users WHERE email = ? LIMIT 1";
+    $stmt = $conn->prepare($checkEmail);
+    $stmt->bind_param("s", $email);
+    $stmt->execute();
+    $result = $stmt->get_result();
 
-    if ($conn->query($sql) === TRUE) {
-        echo "<script>alert('Registration successful!'); window.location='login.php';</script>";
-    } else {
-        echo "Error: " . $sql . "<br>" . $conn->error;
+    if ($result->num_rows > 0) {
+        // 2. If a row is found, stop the registration
+        echo "<script>alert('This email is already registered!'); window.history.back();</script>";
+        exit();
     }
+
+    // 3. If code reaches here, the email is unique. Proceed with INSERT...
+    $sql = "INSERT INTO users (full_name, email, password, role) VALUES (?, ?, ?, ?)";
+    // ... rest of your insert code
 
     $conn->close();
 }

@@ -11,25 +11,33 @@ $userName = $_SESSION['full_name'];
 
 // HELPER
 function addNotification($conn, $uid, $msg) {
-    $stmt = $conn->prepare("INSERT INTO notifications (user_id, message) VALUES (?, ?)");
+    $stmt = $conn->prepare("INSERT INTO notifications (user_id, message, is_read) VALUES (?, ?, 0)");
     $stmt->bind_param("is", $uid, $msg);
     $stmt->execute();
 }
 
-// ISSUE BOOK
+// --- 1. UPDATED ISSUE BOOK LOGIC ---
 if (isset($_POST['issue_book'])) {
     $trans_id = $_POST['transaction_id'];
-    $date = date('Y-m-d');
-    $stmt = $conn->prepare("UPDATE transactions SET status = 'Borrowed', date_borrowed = ? WHERE id = ?");
-    $stmt->bind_param("si", $date, $trans_id);
-    if ($stmt->execute()) header("Refresh:0");
+    $borrow_date = date('Y-m-d');
+    
+    // Get the manual due date from the form
+    $due_date = $_POST['due_date']; 
+
+    // Update Transaction: Set Status, Borrowed Date, AND Due Date
+    $stmt = $conn->prepare("UPDATE transactions SET status = 'Borrowed', date_borrowed = ?, due_date = ? WHERE id = ?");
+    $stmt->bind_param("ssi", $borrow_date, $due_date, $trans_id);
+    
+    if ($stmt->execute()) {
+        header("Refresh:0");
+    }
 }
 
 // RETURN BOOK
 if (isset($_POST['return_book'])) {
     $trans_id = $_POST['transaction_id'];
     $book_id = $_POST['book_id_ref'];
-    $student_id = $_POST['student_id']; // For notification
+    $student_id = $_POST['student_id']; 
     $date = date('Y-m-d');
 
     $stmt = $conn->prepare("UPDATE transactions SET status = 'Returned', date_returned = ? WHERE id = ?");
@@ -37,7 +45,6 @@ if (isset($_POST['return_book'])) {
     
     if ($stmt->execute()) {
         $conn->query("UPDATE books SET quantity = quantity + 1 WHERE book_id = $book_id");
-        // Notify student
         addNotification($conn, $student_id, "Your return has been processed. Thank you!");
         header("Refresh:0");
     }
@@ -50,7 +57,7 @@ $borCount = $conn->query("SELECT COUNT(*) as total FROM transactions WHERE statu
 // NOTIFICATIONS
 $notifSql = "SELECT * FROM notifications WHERE user_id = $userId ORDER BY created_at DESC";
 $notifications = $conn->query($notifSql);
-$notifCount = $notifications->num_rows;
+$notifCount = $conn->query("SELECT COUNT(*) as unread FROM notifications WHERE user_id = $userId AND is_read = 0")->fetch_assoc()['unread'];
 ?>
 
 <!DOCTYPE html>
@@ -60,18 +67,23 @@ $notifCount = $notifications->num_rows;
   <title>Staff Dashboard</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="SD.css">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
   <style>
-    /* Button Colors */
-    .btn.issue { background-color: #10b981; border: none; color: white; } 
-    .btn.return { background-color: #ef4444; border: none; color: white; }
-    .staff-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-    @media (max-width: 1000px) { .staff-layout { grid-template-columns: 1fr; } }
-    
-    /* Modal Styles */
-    .modal { display: none; position: fixed; z-index: 100; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); }
-    .modal-content { background-color: #fff; margin: 10% auto; padding: 20px; border-radius: 12px; width: 90%; max-width: 500px; box-shadow: 0 4px 20px rgba(0,0,0,0.2); }
-    .close { float: right; font-size: 24px; cursor: pointer; }
-    .badge { background: #ef4444; color: white; font-size: 10px; padding: 2px 6px; border-radius: 10px; margin-left: 5px; }
+    /* Specific styles for the date input in the table */
+    .date-input {
+        padding: 6px;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        font-family: inherit;
+        font-size: 13px;
+        color: #333;
+        outline: none;
+    }
+    .action-form {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+    }
   </style>
 </head>
 <body>
@@ -83,7 +95,12 @@ $notifCount = $notifications->num_rows;
       </section>
       <nav class="nav">
         <a href="staff_dashboard.php">📊 Dashboard</a>
-        <a href="#" onclick="openModal()">🔔 Notifications <?php if($notifCount > 0) echo "<span class='badge'>$notifCount</span>"; ?></a>
+        <a href="#" onclick="openModal()">
+            🔔 Notifications 
+            <?php if($notifCount > 0): ?>
+                <span class='badge' id="navBadge"><?php echo $notifCount; ?></span>
+            <?php endif; ?>
+        </a>
         <a href="logout.php" class="signout">🚪 Sign Out</a>
       </nav>
     </aside>
@@ -99,23 +116,40 @@ $notifCount = $notifications->num_rows;
 
         <section class="panels">
           <div class="staff-layout">
+            
             <div class="panel">
-                <div class="panel-header"><h3>📍 Issue Book</h3></div>
+                <div class="panel-header"><h3>📍 Issue Book (Set Due Date)</h3></div>
                 <div class="table-wrap">
                     <table>
                         <thead><tr><th>Student</th><th>Book</th><th>Action</th></tr></thead>
                         <tbody>
                         <?php
                         $res = $conn->query("SELECT t.id, u.full_name, b.title FROM transactions t JOIN users u ON t.user_id = u.userID JOIN books b ON t.book_id = b.book_id WHERE t.status = 'Reserved'");
+                        
+                        // Calculate default due date (e.g., Today + 7 days)
+                        $defaultDue = date('Y-m-d', strtotime('+7 days'));
+
                         while($row = $res->fetch_assoc()) {
-                            echo "<tr><td>{$row['full_name']}</td><td>{$row['title']}</td>
-                            <td><form method='POST'><input type='hidden' name='transaction_id' value='{$row['id']}'><button type='submit' name='issue_book' class='btn issue'>Issue</button></form></td></tr>";
+                            echo "<tr>";
+                            echo "<td>{$row['full_name']}</td>";
+                            echo "<td>{$row['title']}</td>";
+                            echo "<td>
+                                    <form method='POST' class='action-form'>
+                                        <input type='hidden' name='transaction_id' value='{$row['id']}'>
+                                        
+                                        <input type='date' name='due_date' value='$defaultDue' required class='date-input'>
+                                        
+                                        <button type='submit' name='issue_book' class='btn issue'>Issue</button>
+                                    </form>
+                                  </td>";
+                            echo "</tr>";
                         }
                         ?>
                         </tbody>
                     </table>
                 </div>
             </div>
+
             <div class="panel">
                 <div class="panel-header"><h3>🔄 Return Book</h3></div>
                 <div class="table-wrap">
@@ -125,19 +159,25 @@ $notifCount = $notifications->num_rows;
                         <?php
                         $bor = $conn->query("SELECT t.id, t.book_id, t.user_id, u.full_name, b.title FROM transactions t JOIN users u ON t.user_id = u.userID JOIN books b ON t.book_id = b.book_id WHERE t.status = 'Borrowed'");
                         while($row = $bor->fetch_assoc()) {
-                            echo "<tr><td>{$row['full_name']}</td><td>{$row['title']}</td>
-                            <td><form method='POST'>
-                            <input type='hidden' name='transaction_id' value='{$row['id']}'>
-                            <input type='hidden' name='book_id_ref' value='{$row['book_id']}'>
-                            <input type='hidden' name='student_id' value='{$row['user_id']}'>
-                            <button type='submit' name='return_book' class='btn return'>Return</button>
-                            </form></td></tr>";
+                            echo "<tr>";
+                            echo "<td>{$row['full_name']}</td>";
+                            echo "<td>{$row['title']}</td>";
+                            echo "<td>
+                                    <form method='POST'>
+                                        <input type='hidden' name='transaction_id' value='{$row['id']}'>
+                                        <input type='hidden' name='book_id_ref' value='{$row['book_id']}'>
+                                        <input type='hidden' name='student_id' value='{$row['user_id']}'>
+                                        <button type='submit' name='return_book' class='btn return'>Return</button>
+                                    </form>
+                                  </td>";
+                            echo "</tr>";
                         }
                         ?>
                         </tbody>
                     </table>
                 </div>
             </div>
+
           </div>
         </section>
       </div>
@@ -148,14 +188,22 @@ $notifCount = $notifications->num_rows;
     <div class="modal-content">
       <span class="close" onclick="closeModal()">&times;</span>
       <h3>🔔 Notifications</h3>
-      <ul style="padding:0; list-style:none; margin-top:10px;">
-        <?php foreach ($notifications as $n) { echo "<li style='padding:10px; border-bottom:1px solid #eee;'>".htmlspecialchars($n['message'])."</li>"; } ?>
+      <ul class="notif-list">
+        <?php foreach ($notifications as $n) { 
+             $bg = ($n['is_read'] == 0) ? "background:#f0f9ff;" : "";
+             echo "<li class='notif-item' style='$bg'>".htmlspecialchars($n['message'])."</li>"; 
+        } ?>
       </ul>
     </div>
   </div>
 
   <script>
-    function openModal() { document.getElementById('notifModal').style.display = "block"; }
+    function openModal() { 
+        document.getElementById('notifModal').style.display = "block";
+        const badge = document.getElementById('navBadge');
+        if(badge) badge.style.display = 'none';
+        fetch('mark_as_read.php');
+    }
     function closeModal() { document.getElementById('notifModal').style.display = "none"; }
     window.onclick = function(e) { if(e.target.id == 'notifModal') closeModal(); }
   </script>
