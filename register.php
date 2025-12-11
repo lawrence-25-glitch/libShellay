@@ -1,47 +1,67 @@
 <?php
- include 'db.php';
+include 'db.php'; 
+
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
+    // 1. Capture All Form Inputs
     $fullName = $_POST['fullName'];
     $email = $_POST['email'];
-    $studentId = $_POST['studentId'];
+    $studentId = $_POST['studentId']; // Make sure your DB has this column
     $role = $_POST['role'];
-    $phone = $_POST['phone'];
+    $phone = $_POST['phone'];         // Make sure your DB has this column
     $password = $_POST['password'];
     $confirmPassword = $_POST['confirmPassword'];
 
+    // 2. Validate Passwords
     if ($password !== $confirmPassword) {
         echo "<script>alert('Passwords do not match!'); window.history.back();</script>";
         exit();
     }
 
-    $conn = new mysqli("localhost", "root", "", "library");
-
-    if ($conn->connect_error) {
-        die("Connection failed: " . $conn->connect_error);
+    // (Create connection if db.php didn't)
+    if (!isset($conn)) {
+        $conn = new mysqli("localhost", "root", "", "library");
+        if ($conn->connect_error) { die("Connection failed: " . $conn->connect_error); }
     }
 
-    $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
-    // 1. Check if email already exists
+    // 3. Check for Duplicate Email
     $checkEmail = "SELECT email FROM users WHERE email = ? LIMIT 1";
     $stmt = $conn->prepare($checkEmail);
     $stmt->bind_param("s", $email);
     $stmt->execute();
-    $result = $stmt->get_result();
-
-    if ($result->num_rows > 0) {
-        // 2. If a row is found, stop the registration
+    if ($stmt->get_result()->num_rows > 0) {
         echo "<script>alert('This email is already registered!'); window.history.back();</script>";
         exit();
     }
 
-    // 3. If code reaches here, the email is unique. Proceed with INSERT...
-    $sql = "INSERT INTO users (full_name, email, password, role) VALUES (?, ?, ?, ?)";
-    // ... rest of your insert code
+    // 4. INSERT DATA (THE FIX)
+    $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
 
+    // We explicitly add 'status' and set it to 'pending'
+    // We also add 'student_id' and 'phone_number' to match your form
+    $sql = "INSERT INTO users (full_name, email, student_id, role, phone_number, password, status) 
+            VALUES (?, ?, ?, ?, ?, ?, 'pending')";
+    
+    $stmt = $conn->prepare($sql);
+    
+    // Bind parameters: "ssssss" (6 strings)
+    // Name, Email, ID, Role, Phone, Password
+    $stmt->bind_param("ssssss", $fullName, $email, $studentId, $role, $phone, $hashedPassword);
+
+    if ($stmt->execute()) {
+        // 5. SUCCESS & REDIRECT
+        echo "<script>
+            alert('Registration Successful! Your account is pending approval.');
+            window.location.href = 'landing_page.php';
+        </script>";
+        exit();
+    } else {
+        echo "<script>alert('Database Error: " . $stmt->error . "'); window.history.back();</script>";
+    }
+
+    $stmt->close();
     $conn->close();
 }
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -81,7 +101,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     <option value="">Select your role</option>
                     <option value="Student">Student</option>
                     <option value="Teacher">Teacher</option>
-                    <option value="Librarian">Librarian</option>
                     <option value="Staff">Staff</option>
                 </select>
             </div>
@@ -116,7 +135,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
         <div class="note">
             <p><strong>Note:</strong> Account registration requires approval.</p>
-            <p>After submitting, please visit the library with a valid ID for account verification and activation.</p>
+            <p>After submitting, please visit the library with a valid ID for account verification.</p>
         </div>
     </div>
 

@@ -1,6 +1,6 @@
 <?php
 session_start();
-
+include 'db.php';
 // --- CONFIGURATION ---
 // Connect to database (Adjust generic "root" and "" if you have a password)
 $conn = new mysqli("localhost", "root", "", "library");
