@@ -1,0 +1,127 @@
+        body {
+            font-family: Arial, sans-serif;
+            background: url('pics/cat.jpg') no-repeat center center/cover;
+            height: 100%; 
+            margin: 0;
+            padding: 0;
+        }
+        
+        .container {
+            background-color: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.3);
+            max-width: 400px;
+            width: 90%;
+            margin: 50px auto;
+            padding: 30px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .header .emoji {
+            font-size: 50px;
+            margin-bottom: 10px;
+        }
+
+        .header h1 {
+            font-size: 26px;
+            color: #222;
+            margin-bottom: 5px;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 14px;
+        }
+
+        form {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        label {
+            font-size: 14px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        input, select {
+            max-width: -webkit-fill-available;
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            font-size: 14px;
+            outline: none;
+            
+        }
+
+        input:focus, select:focus {
+            border-color: #007bff;
+            box-shadow: 0 0 3px rgba(0,123,255,0.3);
+        }
+
+        .checkbox-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: #333;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: #1e9c4a;
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        button:hover {
+            background-color: #167c3a;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .footer p {
+            font-size: 13px;
+            color: #555;
+        }
+
+        .footer button {
+            background: none;
+            color: #007bff;
+            border: none;
+            font-size: 13px;
+            cursor: pointer;
+            padding: 0;
+        }
+
+        .footer button:hover {
+            text-decoration: underline;
+        }
+
+        .note {
+            background-color: #e6f0ff;
+            border-left: 4px solid #4a90e2;
+            padding: 10px;
+            border-radius: 6px;
+            margin-top: 20px;
+        }
+
+        .note p {
+            font-size: 12px;
+            color: #1a3d7c;
+            margin: 5px 0;
+        }
